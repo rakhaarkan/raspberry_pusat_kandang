@@ -3,6 +3,7 @@ import asyncio
 from variabel_global import gl
 from pathlib import Path
 from datetime import datetime
+import copy
 
 FILE_PATH = Path("/home/rakha/Documents/Project_Kandang/data_state.json")
 FILE_PATH_SENSOR = Path("/home/rakha/Documents/Project_Kandang/data_sensor.json")
@@ -40,39 +41,12 @@ def save_data(data):
     with open(FILE_PATH_SENSOR, "w") as f:
         json.dump(data, f, indent=2)
 
-def simpan_sensor():
-    jam = datetime.now().hour
-    jam_str = str(jam)
-
-    data = load_data()
-
-    # Pastikan slot jam adalah dict
-    if jam_str not in data or not isinstance(data[jam_str], dict):
-        data[jam_str] = {}
-
-    # Update hanya field yang tersedia
-    if gl.suhu_atas is not None:
-        data[jam_str]["sha"] = gl.suhu_atas
-
-    if gl.kelembapan_luar is not None:
-        data[jam_str]["kll"] = gl.kelembapan_luar
-
-    if gl.suhu_luar is not None:
-        data[jam_str]["shl"] = gl.suhu_luar
-
-    if gl.kwh_jam is not None:
-        data[jam_str]["lst"] = gl.kwh_jam
-
-    save_data(data)
-
-    print(f"[simpan_sensor] Jam {jam} diperbarui ? {data[jam_str]}")
-
-def _to_int_no_decimal(value):
+def _to_int_no_decimal(value,jumlah_angka=1):
     """Ubah float ke integer tanpa koma (x10)."""
     if value is None:
         return None
     try:
-        return int(round(value * 10))  # 33.7 -> 337
+        return int(round(value * (10**jumlah_angka)))  # 33.7 -> 337
     except:
         return None
 
@@ -116,31 +90,34 @@ def baca_json_sensor():
 
 
 def simpan_data():
+    
     data = {
-        "kipas": gl.kipas,
-        "konfigurasi": [
-            gl.mode_kandang,
-            gl.usia_ayam,
-            _serialize_dt(gl.tanggal_masuk_ayam),
-            gl.jumlah_kipas_timer,
-            gl.waktu_hidup,
-            gl.waktu_mati,
-            gl.jumlah_ayam_awal,
-            gl.jumlah_ayam_mati,
-            gl.jumlah_pakan_sak,
-            gl.bobot_rata_rata,
-            gl.harga_kontrak_ayam,
-            gl.harga_bibit_ayam,
-            gl.harga_obat_ayam,
-            gl.harga_pakan_kg,
-            gl.jumlah_ayam_dipanen
-        ]
+        "kipas": gl.kipas
     }
-
+    
+    #print(gl.last_saved_data)
+    #print(data)
+    # -----------------------------
+    # CEK PERUBAHAN
+    # -----------------------------
+    if gl.last_saved_data is not None:
+        if data == gl.last_saved_data:
+            # Tidak ada perubahan
+            print("[simpan_data] Tidak ada perubahan, file tidak disimpan.")
+            return
+    
+    # -----------------------------
+    # ADA PERUBAHAN ? SIMPAN
+    # -----------------------------
     try:
         with open(FILE_PATH, "w") as f:
-            json.dump(data, f)
-        print("[simpan_data] Data berhasil disimpan. kipas : ", gl.kipas)
+            json.dump(data, f, indent=2)
+
+        # Update snapshot
+        gl.last_saved_data = copy.deepcopy(data)
+
+        print("[simpan_data] Data disimpan. kipas:", gl.kipas)
+
     except Exception as e:
         print("[simpan_data] ERROR:", e)
         
@@ -165,7 +142,7 @@ def muat_data():
 
         # --- KONFIGURASI ---
         konfigurasi = data.get("konfigurasi", [])
-        if len(konfigurasi) >= 15:
+        if len(konfigurasi) >= 18:
             (
                 gl.mode_kandang,
                 gl.usia_ayam,
@@ -181,11 +158,15 @@ def muat_data():
                 gl.harga_bibit_ayam,
                 gl.harga_obat_ayam,
                 gl.harga_pakan_kg,
-                gl.jumlah_ayam_dipanen
-            ) = konfigurasi[:15]
+                gl.jumlah_ayam_dipanen,
+                gl.cek_proteksi_listrik,
+                gl.flag_database_AI,
+                gl.flag_alarm_siaga
+            ) = konfigurasi[:18]
 
         print("[muat_data] Data berhasil dimuat")
 
     except Exception as e:
         print("[muat_data] ERROR parsing file:", e)
 
+print("penyimpanan_data.py dimuat.")

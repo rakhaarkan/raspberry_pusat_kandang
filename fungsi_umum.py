@@ -1,11 +1,52 @@
 import asyncio
 import datetime
-import time
+import time, json
 from variabel_global import gl
 from penyimpanan_data import simpan_data
-
+import database_sqlite as db
+import status_esp32
+import requests
 import serial,time
 import serial.tools.list_ports
+
+# fungsi_umum.py
+
+_broadcast_callback = None
+_loop = None
+
+
+def register_broadcast_callback(callback, loop):
+    global _broadcast_callback, _loop
+    _broadcast_callback = callback
+    _loop = loop
+
+
+def broadcastkan():
+    if _broadcast_callback and _loop:
+        _loop.call_soon_threadsafe(
+            lambda: asyncio.create_task(_broadcast_callback())
+        )
+
+def _serialize_dt(dt):
+    if dt is None:
+        return None
+    if isinstance(dt, datetime.datetime):
+        return dt.isoformat(sep=' ', timespec='microseconds')
+    return str(dt)
+
+
+def cek_null(v):
+    """
+    Return 0 jika variabel None, '' atau 0.
+    Return 1 jika variabel ada nilainya.
+    """
+    if v is None:
+        return 0
+    if v == "":
+        return 0
+    if v == 0:
+        return 0
+    return 1
 
 
 def connect_serial():
@@ -97,10 +138,46 @@ def send_serial(text):
         gl.ser = None  # dianggap putus
         return False
 
+import json
+
+async def cek_serial():
+    if gl.ser is None:
+        connect_serial()
+        return
+
+    raw = baca_serial_nonblocking()
+    if not raw:
+        return
+
+    try:
+        # pastikan string
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", errors="ignore")
+
+        raw = raw.strip()
+
+        data = json.loads(raw)   # ← INI KUNCI UTAMA
+
+    except Exception as e:
+        print("[ERROR] cek_serial:", e)
+        print("[RAW DATA]", repr(raw))
+        return
+
+    # gl.kipas disinkronkan lewat status_esp32.py (cek generasi+boot_id
+    # dulu, bukan ditimpa buta) - ACK Serial ini rawan race condition yang
+    # sama persis dengan poll HTTP /kps: kalau ACK ini kebetulan datang
+    # basi/telat, jangan sampai nimpa command yang lebih baru dari RPi.
+    status_esp32.terapkan_status_kipas(data)
+    gl.kipas_inspeksi[:5] = data["kpi"][:5]
+    gl.kipas_saklar[:5] = data["kcs"][:5]
+    gl.state_tanaman[:5] = data["stn"][:5]
+
+    print("[ESP32]", data)
+
 
 def atur_target(trgtsh, shmin=0, shmax=0):
     """Atur target suhu + batas minimal/maksimal otomatis."""
-    gl.target_suhu = trgtsh
+    gl.target_suhu = trgtsh/10
     # jika shmin tidak diberikan ? trgtsh - 30
     gl.suhu_minimal = shmin if shmin != 0 else trgtsh - 30
     # jika shmax tidak diberikan ? trgtsh + 30
@@ -158,24 +235,12 @@ def set_target():
 
     if gl.usia_ayam in tabel_target:
         atur_target(tabel_target[gl.usia_ayam])
+        print(f"[set_target] Usia {gl.usia_ayam} hari -> Target suhu {gl.target_suhu}°C")
+    else:        
+        print(f"[set_target] Usia {gl.usia_ayam} hari tidak ada di tabel, target suhu tidak diubah.")
 
 
-def atur_usia(hari_input: int):
-    """
-    Mengatur tanggal masuk ayam berdasarkan hari_input (umur ayam saat ini).
-    """
-    now = datetime.datetime.now()
-    tanggal_masuk = now - datetime.timedelta(days=hari_input)
-
-    # Simpan tanggal masuk ayam ke variabel global (as datetime)
-    gl.tanggal_masuk_ayam = tanggal_masuk
-
-    # Simpan permanen ke file JSON (sinkron)
-    simpan_data()
-
-    # Setelah itu, perbarui informasi waktu dan usia
-    tanggal_waktu_usia()
-
+import datetime
 
 def _parse_dt_maybe(value):
     """Coba parse value ke datetime; bisa menerima datetime atau string."""
@@ -198,46 +263,116 @@ def _parse_dt_maybe(value):
     # gagal parse
     return None
 
+import datetime
+import time
+
 def tanggal_waktu_usia():
     """
-    Menghitung usia ayam dalam hari berdasarkan tanggal_masuk_ayam.
-    Menyimpan hasil ke variabel global.
+    Menghitung usia ayam (hari bulat) dan hari_ke (desimal).
+    Epoch hari dimulai dari jam 00:00.
     """
+    #db.muat_konfigurasi_sqlite()  # pastikan data terbaru dari SQLite
     now = datetime.datetime.now()
-    # Epoch timestamp (detik sejak 1 Jan 1970)
+
+    # =========================
+    # Epoch & waktu realtime
+    # =========================
     gl.epoch_data_waktu = int(time.time())
 
-    # Bagian-bagian waktu
     gl.jam   = now.hour
     gl.menit = now.minute
     gl.detik = now.second
     gl.hari  = now.day
     gl.bulan = now.month
     gl.tahun = now.year
-    
+
     gl.data_waktu = now.strftime("%H:%M:%S %d/%m/%Y")
 
-    # Pastikan gl.tanggal_masuk_ayam sudah diisi
+    # =========================
+    # Validasi tanggal masuk
+    # =========================
     if not hasattr(gl, "tanggal_masuk_ayam") or gl.tanggal_masuk_ayam is None:
-        gl.usia_ayam = 0
+        print("[tanggal_waktu_usia] WARNING: tanggal_masuk_ayam belum diatur.")
+        #gl.usia_ayam = 0
+        #gl.hari_ke = 0.00
         return
 
     tanggal_masuk = _parse_dt_maybe(gl.tanggal_masuk_ayam)
     if tanggal_masuk is None:
-        # can't parse ? set usia 0 atau handling khusus
         print("[tanggal_waktu_usia] WARNING: tidak bisa parse tanggal_masuk_ayam:", gl.tanggal_masuk_ayam)
-        gl.usia_ayam = 0
+        #gl.usia_ayam = 0
+        #gl.hari_ke = 0.00
         return
 
-    delta = now - tanggal_masuk
-    gl.usia_ayam = delta.days  # usia ayam dalam hari
-    
+    # =========================
+    # Hitung berbasis MIDNIGHT
+    # =========================
+    today_midnight = now.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+
+    delta_midnight = today_midnight - tanggal_masuk
+
+    # Usia ayam BULAT (ganti jam 00:00)
+    gl.usia_ayam = max(0, delta_midnight.days)
+
+    # =========================
+    # Hari ke (desimal)
+    # =========================
+    # Detik sejak midnight hari ini
+    detik_hari_ini = (
+        now.hour * 3600 +
+        now.minute * 60 +
+        now.second
+    )
+
+    hari_ke_float = gl.usia_ayam + (detik_hari_ini / 86400.0)
+    gl.hari_ke = float(f"{hari_ke_float:.2f}")
+
+    # =========================
+    # Simpan tanggal masuk pecahan
+    # =========================
     gl.tanggal_masuk_ayam_tahun = tanggal_masuk.year
     gl.tanggal_masuk_ayam_bulan = tanggal_masuk.month
-    gl.tanggal_masuk_ayam_hari = tanggal_masuk.day
+    gl.tanggal_masuk_ayam_hari  = tanggal_masuk.day
 
-    simpan_data()
+    # =========================
+    # Persist & update target
+    # =========================
+    db.simpan_data_sqlite()
     set_target()
+    broadcastkan()
+    print(f"[tanggal_waktu_usia] Usia ayam: {gl.usia_ayam} hari | Hari ke: {gl.hari_ke}")
+
+def atur_usia(hari_input: int):
+    """
+    Mengatur tanggal masuk ayam berdasarkan umur ayam saat ini.
+    Epoch hari dimulai dari jam 00:00.
+    """
+
+    now = datetime.datetime.now()
+
+    # Set ke awal hari (00:00)
+    today_midnight = datetime.datetime(
+        year=now.year,
+        month=now.month,
+        day=now.day,
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+
+    # Mundurkan sesuai umur ayam
+    tanggal_masuk = today_midnight - datetime.timedelta(days=hari_input)
+
+    # Simpan ke variabel global
+    gl.tanggal_masuk_ayam = tanggal_masuk
+    tanggal_waktu_usia()
+    # Simpan permanen
+    db.simpan_data_sqlite()
+    broadcastkan()
+
 
 
 # ======================================================
@@ -247,6 +382,13 @@ def two_digits(value: int) -> str:
     """Mengubah angka menjadi string 2 digit, misal 7 -> '07'"""
     return f"{value:02d}"
 
+HEALTHCHECK_URL = "https://hc-ping.com/7e11a194-6153-4bfe-827b-df05e5d48539"
+
+def send_heartbeat():
+    try:
+        requests.get(HEALTHCHECK_URL, timeout=5)
+    except requests.RequestException:
+        pass
 
 
-print("fungsi umum ok")
+print("fungsi_umum.py dimuat.")

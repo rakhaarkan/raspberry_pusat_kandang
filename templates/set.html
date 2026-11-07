@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kandang</title>
+<script>try{var m=document.cookie.match(/(?:^|; )tema=(dark|light)/);if(m)document.documentElement.dataset.theme=m[1]}catch(e){}</script>
+<link rel="stylesheet" href="/static/set.css">
+</head>
+<body>
+<header>
+  <h1>Kandang</h1>
+  <span id="pill" class="pill wait">Menghubungkan…</span>
+  <button id="tema" class="sakelar" role="switch" aria-checked="false" aria-label="Mode gelap"></button>
+</header>
+<main>
+  <div id="banner" hidden>Terputus dari server, menghubungkan ulang…</div>
+  <section id="tab-kandang">
+    <div class="hero">
+      <div class="lbl">Suhu kandang</div>
+      <div class="suhu"><span id="suhu">--</span><small>°C</small></div>
+      <div id="zona" class="zona"></div>
+    </div>
+    <div class="card">
+      <div class="lbl">Mode</div>
+      <div class="seg" id="mode"><button data-v="1">Auto</button><button data-v="2">Manual</button><button data-v="3">Timer</button><button data-v="4">Panen</button></div>
+      <div class="baris"><span class="lbl">Usia ayam</span>
+        <div class="step"><button id="u-" aria-label="Kurangi usia">−</button><b id="usia">0</b><button id="u+" aria-label="Tambah usia">+</button><span>hari</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="lbl">Kipas <span id="kunci" class="kunci" hidden></span></div>
+      <div id="kipas" class="kipas"></div>
+    </div>
+    <div id="auto" class="card" hidden>
+      <div class="lbl">Pengaturan auto</div>
+      <div class="baris" style="margin:0 0 12px"><span class="lbl">Aturan untuk usia</span>
+        <div class="step"><button id="a-" aria-label="Usia sebelumnya">−</button><b id="ausia">0</b><button id="a+" aria-label="Usia berikutnya">+</button><span>hari</span></div></div>
+      <div class="lbl">Kipas wajib hidup</div><div id="wajib" class="chips"></div>
+      <div class="lbl" style="margin-top:14px">Aturan suhu <small id="adirty" hidden>(belum disimpan)</small></div>
+      <div id="sl"><div id="tr"></div><div id="tks"></div><div id="hds"></div><div id="now" hidden></div><div id="nowl" hidden></div></div>
+      <div class="acts"><button id="addr" class="b-no">Tambah aturan</button><button id="asave" class="b-ok">Simpan</button></div>
+    </div>
+    <div id="timer" class="card" hidden>
+      <div class="lbl">Siklus timer</div>
+      <div class="ring"><svg viewBox="0 0 100 100"><circle class="trk" cx="50" cy="50" r="44"/><circle id="ring" class="arc" cx="50" cy="50" r="44"/></svg>
+        <div class="isi"><small id="tstat"></small><div id="tcd">00:00</div></div></div>
+    </div>
+    <div id="cfg" class="card" hidden>
+      <div class="lbl">Pengaturan timer</div>
+      <div class="g"><label>Jumlah kipas<select id="s-jml"></select></label><label>Waktu hidup<select id="s-hdp"></select></label><label>Waktu mati<select id="s-mti"></select></label></div>
+    </div>
+  </section>
+  <section id="tab-dashboard" hidden><iframe id="dash" class="frame" title="Dashboard" allowfullscreen></iframe></section>
+  <section id="tab-data" hidden>
+    <div class="card"><div class="lbl">Data ayam</div><div id="fields"></div></div>
+    <div class="card">
+      <div class="lbl">Pengaturan kandang</div>
+      <label class="sw"><span>Proteksi listrik overload<small>Menjaga kipas agar tidak hidup semua sekaligus, supaya listrik kandang tidak mati akibat arus berlebih.</small></span><input id="prt" type="checkbox"></label>
+      <label class="sw"><span>Alarm lampu kipas rumah<small>Lampu indikator kipas di rumah berkedip saat listrik mati.</small></span><input id="alm" type="checkbox"></label>
+      <label class="sw"><span>Tulis database<small>Menyimpan data sensor dan kipas ke database pelatihan.</small></span><input id="dbw" type="checkbox"></label>
+    </div>
+    <div class="card"><div class="lbl">Log data</div><pre id="log"></pre><a class="btn" href="/api/download-db">Unduh database</a></div>
+  </section>
+  <section id="tab-kebun" hidden><div id="dev"></div></section>
+</main>
+<nav>
+  <button data-t="kandang" class="on"><span>🐔</span>Kandang</button>
+  <button data-t="kebun"><span>🌱</span>Kebun</button>
+  <button data-t="dashboard"><span>📊</span>Dashboard</button>
+  <button data-t="data"><span>📋</span>Data</button>
+</nav>
+<div id="ov" hidden></div>
+<div id="sheet" hidden>
+  <div class="seg" id="sm" style="grid-template-columns:1fr 1fr"><button data-m="S">Berdasarkan suhu</button><button data-m="T">Siklus timer</button></div>
+  <label>Jika suhu lebih dari (°C)<input id="p-t" type="number" step="0.1" min="25" max="37"></label>
+  <div id="p-S"><div class="lbl" style="margin-top:12px">Kipas yang hidup</div><div id="p-f" class="chips"></div></div>
+  <div id="p-T" class="g2">
+    <label>Suhu pemetaan min (°C)<input id="p-mn" type="number" step="0.1"></label><label>Suhu pemetaan maks (°C)<input id="p-mx" type="number" step="0.1"></label>
+    <label>Jumlah kipas (1–5)<input id="p-j" type="number" min="1" max="5"></label><span></span>
+    <label>Hidup min (detik)<input id="p-a" type="number"></label><label>Hidup maks (detik)<input id="p-b" type="number"></label>
+    <label>Mati min (menit)<input id="p-c" type="number"></label><label>Mati maks (menit)<input id="p-d" type="number"></label>
+  </div>
+  <div class="acts"><button id="p-ok" class="b-ok">Terapkan</button><button id="p-del" class="b-del">Hapus</button><button id="p-no" class="b-no">Batal</button></div>
+</div>
+<div id="toast"></div>
+<script>window.INIT=__INIT__;</script>
+<script src="/static/set.js"></script>
+</body>
+</html>

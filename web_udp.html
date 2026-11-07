@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ESP32 UDP Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <style>
+    /* ── CSS Variables ──────────────────────────────────────────────── */
+    :root {
+      --bg:          #0a0c0e;
+      --bg-panel:    #0f1214;
+      --bg-tab:      #141820;
+      --bg-tab-act:  #0f1214;
+      --border:      #1e2530;
+      --border-hot:  #2e8b57;
+
+      --amber:       #e8a020;
+      --amber-dim:   #7a5010;
+      --green:       #2e8b57;
+      --green-bright:#3dbb70;
+      --red:         #c0392b;
+      --muted:       #4a5568;
+      --text:        #c8d0d8;
+      --text-dim:    #5a6478;
+
+      --font-mono:   'Share Tech Mono', 'Courier New', monospace;
+      --font-ui:     'Rajdhani', sans-serif;
+
+      --tab-h:       38px;
+      --header-h:    54px;
+      --status-h:    28px;
+    }
+
+    /* ── Reset ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 14px;
+
+      /* subtle scan-line texture */
+      background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(255,255,255,0.012) 2px,
+        rgba(255,255,255,0.012) 4px
+      );
+    }
+
+    /* ── Layout shell ───────────────────────────────────────────────── */
+    #app {
+      display: grid;
+      grid-template-rows: var(--header-h) var(--tab-h) 1fr var(--status-h);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────── */
+    #header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 0 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-panel);
+    }
+
+    .logo-bracket {
+      color: var(--green);
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -2px;
+      font-family: var(--font-mono);
+    }
+
+    #header h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    #header h1 span { color: var(--amber); }
+
+    .header-right {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .stat-pill strong {
+      color: var(--amber);
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+
+    /* ── WebSocket indicator ─────────────────────────────────────────── */
+    #ws-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--red);
+      transition: background 0.4s;
+      flex-shrink: 0;
+    }
+
+    #ws-dot.connected   { background: var(--green-bright); animation: pulse 2s infinite; }
+    #ws-dot.connecting  { background: var(--amber); animation: blink 0.6s infinite; }
+
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(61,187,112,0.5); }
+      50%      { box-shadow: 0 0 0 5px rgba(61,187,112,0); }
+    }
+    @keyframes blink { 50% { opacity: 0.2; } }
+
+    /* ── Tab bar ─────────────────────────────────────────────────────── */
+    #tab-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      padding: 0 8px;
+      border-bottom: 2px solid var(--border);
+      background: var(--bg);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    #tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 14px;
+      height: 34px;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      border-radius: 4px 4px 0 0;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      background: var(--bg-tab);
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      position: relative;
+      top: 2px;
+      user-select: none;
+    }
+
+    .tab:hover { color: var(--text); border-color: var(--border); }
+
+    .tab.active {
+      color: var(--amber);
+      background: var(--bg-tab-act);
+      border-color: var(--border);
+      border-bottom-color: var(--bg-tab-act);
+    }
+
+    .tab .tab-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: background 0.3s;
+    }
+
+    .tab.active .tab-dot { background: var(--green-bright); }
+
+    .tab .badge {
+      font-size: 10px;
+      color: var(--text-dim);
+      background: var(--border);
+      border-radius: 3px;
+      padding: 1px 5px;
+      font-family: var(--font-ui);
+      font-weight: 600;
+    }
+
+    .tab.active .badge {
+      color: var(--amber-dim);
+      background: rgba(232,160,32,0.12);
+    }
+
+    /* ALL tab (always first) */
+    #tab-all { }
+
+    /* empty-state placeholder tab */
+    #tab-placeholder {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: 1px;
+      background: transparent;
+      cursor: default;
+      animation: fade-in 0.5s ease;
+    }
+
+    /* ── Log panels ─────────────────────────────────────────────────── */
+    #panels {
+      position: relative;
+      overflow: hidden;
+      background: var(--bg-panel);
+    }
+
+    .log-panel {
+      position: absolute;
+      inset: 0;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: none;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .log-panel::-webkit-scrollbar       { width: 6px; }
+    .log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .log-panel.active { display: block; }
+
+    .log-line {
+      display: grid;
+      grid-template-columns: 52px 110px 1fr;
+      gap: 10px;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      animation: fade-in 0.15s ease;
+    }
+
+    .log-line:last-child { border-bottom: none; }
+
+    .ll-idx  { color: var(--muted); text-align: right; }
+    .ll-ip   { color: var(--green); }
+    .ll-msg  { color: var(--text); word-break: break-all; }
+
+    /* "ALL" panel uses wider IP column */
+    #panel-all .log-line {
+      grid-template-columns: 52px 110px 1fr;
+    }
+
+    .ping-line {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 0;
+      letter-spacing: 1px;
+    }
+
+    /* empty panel hint */
+    .panel-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+      color: var(--text-dim);
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .panel-empty .big { font-size: 36px; opacity: 0.15; }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(3px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Status bar ─────────────────────────────────────────────────── */
+    #status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 0 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--muted);
+      overflow: hidden;
+    }
+
+    #status-bar span { white-space: nowrap; }
+    #status-text { flex: 1; text-overflow: ellipsis; overflow: hidden; color: var(--text-dim); }
+    #clock { color: var(--muted); }
+
+    /* ── Tooltip ─────────────────────────────────────────────────────── */
+    [title] { cursor: help; }
+
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Header ─────────────────────────────────────────────────────── -->
+  <header id="header">
+    <span class="logo-bracket">[//]</span>
+    <h1>ESP32 &nbsp;<span>UDP</span>&nbsp; MONITOR</h1>
+    <div class="header-right">
+      <div class="stat-pill">
+        DEVICES&nbsp;<strong id="hdr-devices">0</strong>
+      </div>
+      <div class="stat-pill">
+        PACKETS&nbsp;<strong id="hdr-packets">0</strong>
+      </div>
+      <div class="stat-pill">
+        <div id="ws-dot" class="connecting"></div>
+        <span id="ws-label">CONNECTING</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Tab bar ────────────────────────────────────────────────────── -->
+  <nav id="tab-bar">
+    <!-- "ALL" tab is always present -->
+    <div class="tab active" id="tab-all" data-ip="all" onclick="switchTab('all')">
+      <span class="tab-dot"></span>
+      ALL
+      <span class="badge" id="badge-all">0</span>
+    </div>
+    <!-- Device tabs inserted here dynamically -->
+    <div id="tab-placeholder" class="tab">⬡ awaiting devices…</div>
+  </nav>
+
+  <!-- ── Log panels ─────────────────────────────────────────────────── -->
+  <main id="panels">
+    <!-- ALL panel -->
+    <div class="log-panel active" id="panel-all">
+      <div class="panel-empty">
+        <div class="big">◎</div>
+        Waiting for UDP packets
+      </div>
+    </div>
+    <!-- Device panels inserted dynamically -->
+  </main>
+
+  <!-- ── Status bar ─────────────────────────────────────────────────── -->
+  <footer id="status-bar">
+    <span>WS&nbsp;→&nbsp;ws://<span id="sb-host">…</span>:8080/api/ws/udp</span>
+    <span id="status-text">—</span>
+    <span id="clock">00:00:00</span>
+  </footer>
+
+</div>
+
+<script>
+"use strict";
+
+/* ── Constants ────────────────────────────────────────────────────── */
+const WS_URL       = `ws://${location.hostname}:8080/api/ws/udp`;
+const MAX_CHARS    = 5000;   // max stored chars per log buffer
+const RECONNECT_MS = 3000;
+
+/* ── State ────────────────────────────────────────────────────────── */
+const state = {
+  /*
+   * devices: Map<ip_string, DeviceState>
+   *
+   * DeviceState {
+   *   ip:       string   – sender IP (primary key; replace with device_id later)
+   *   label:    string   – display label (same as ip for now)
+   *   count:    number   – packets received
+   *   logBuf:   string   – raw text kept in memory (trimmed to MAX_CHARS)
+   *   lineCount:number   – total lines ever appended
+   * }
+   *
+   * NOTE: When ESP32s get stable IDs, swap `ip` for `device_id` in one place:
+   *   getOrCreateDevice(data.device_id, data.ip)
+   *   and update the label + panel id accordingly.
+   */
+  devices:      new Map(),
+  activeTab:    "all",
+  totalPackets: 0,
+  ws:           null,
+  reconnTimer:  null,
+};
+
+/* ── DOM helpers ──────────────────────────────────────────────────── */
+const $  = (id) => document.getElementById(id);
+const cl = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+
+/* ── Clock ────────────────────────────────────────────────────────── */
+function updateClock() {
+  $("clock").textContent = new Date().toTimeString().slice(0, 8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+$("sb-host").textContent = location.hostname || "localhost";
+
+/* ── Tab management ───────────────────────────────────────────────── */
+function switchTab(ip) {
+  // deactivate all
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".log-panel").forEach(p => p.classList.remove("active"));
+
+  const tabEl   = $(ip === "all" ? "tab-all" : `tab-${sanitizeId(ip)}`);
+  const panelEl = $(ip === "all" ? "panel-all" : `panel-${sanitizeId(ip)}`);
+
+  if (tabEl)   tabEl.classList.add("active");
+  if (panelEl) {
+    panelEl.classList.add("active");
+    panelEl.scrollTop = panelEl.scrollHeight;   // jump to bottom
+  }
+
+  state.activeTab = ip;
+}
+
+/* ── Device creation ──────────────────────────────────────────────── */
+function sanitizeId(ip) {
+  return ip.replace(/\./g, "_");   // e.g. "192.168.1.42" → "192_168_1_42"
+}
+
+function getOrCreateDevice(ip) {
+  if (state.devices.has(ip)) return state.devices.get(ip);
+
+  const dev = { ip, label: ip, count: 0, logBuf: "", lineCount: 0 };
+  state.devices.set(ip, dev);
+
+  // -- remove placeholder if still there
+  const ph = $("tab-placeholder");
+  if (ph) ph.remove();
+
+  // -- create tab
+  const sid  = sanitizeId(ip);
+  const tab  = cl("div", "tab");
+  tab.id     = `tab-${sid}`;
+  tab.setAttribute("data-ip", ip);
+  tab.innerHTML = `
+    <span class="tab-dot"></span>
+    ${ip}
+    <span class="badge" id="badge-${sid}">0</span>
+  `;
+  tab.onclick = () => switchTab(ip);
+  $("tab-bar").appendChild(tab);
+
+  // -- create panel
+  const panel   = cl("div", "log-panel");
+  panel.id      = `panel-${sid}`;
+  panel.innerHTML = `<div class="panel-empty"><div class="big">◎</div>No messages yet</div>`;
+  $("panels").appendChild(panel);
+
+  // -- update header count
+  $("hdr-devices").textContent = state.devices.size;
+  setStatus(`New device: ${ip}`);
+
+  return dev;
+}
+
+/* ── Log rendering ────────────────────────────────────────────────── */
+
+/**
+ * Append a log line to a panel.
+ * Removes the empty-state placeholder on first message.
+ */
+function appendLine(panelEl, idx, ip, message) {
+  // clear empty-state hint
+  const empty = panelEl.querySelector(".panel-empty");
+  if (empty) empty.remove();
+
+  const row  = cl("div", "log-line");
+  row.innerHTML =
+    `<span class="ll-idx">${String(idx).padStart(4, "0")}</span>` +
+    `<span class="ll-ip">${escHtml(ip)}</span>` +
+    `<span class="ll-msg">${escHtml(message)}</span>`;
+
+  panelEl.appendChild(row);
+
+  // trim old rows if buffer exceeded
+  trimPanel(panelEl);
+
+  // auto-scroll if near bottom
+  const nearBottom = panelEl.scrollHeight - panelEl.scrollTop - panelEl.clientHeight < 60;
+  if (nearBottom) panelEl.scrollTop = panelEl.scrollHeight;
+}
+
+/**
+ * Keep log panel memory under control.
+ * We measure total textContent length and drop oldest rows.
+ */
+function trimPanel(panelEl) {
+  let total = panelEl.textContent.length;
+  while (total > MAX_CHARS) {
+    const first = panelEl.querySelector(".log-line");
+    if (!first) break;
+    total -= first.textContent.length;
+    first.remove();
+  }
+}
+
+/* ── Message handler ──────────────────────────────────────────────── */
+function handleMessage(raw) {
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    return;   // ignore malformed
+  }
+
+  // server heartbeat ping – ignore
+  if (data.type === "ping") return;
+
+  const { ip, message } = data;
+  if (!ip || message === undefined) return;
+
+  state.totalPackets++;
+  $("hdr-packets").textContent = state.totalPackets;
+
+  // -- get/create device state
+  const dev = getOrCreateDevice(ip);
+  dev.count++;
+  dev.lineCount++;
+
+  // -- update badge
+  const sid = sanitizeId(ip);
+  const badge = $(`badge-${sid}`);
+  if (badge) badge.textContent = dev.count > 9999 ? "9999+" : dev.count;
+  const badgeAll = $("badge-all");
+  if (badgeAll) badgeAll.textContent = state.totalPackets > 9999 ? "9999+" : state.totalPackets;
+
+  // -- append to ALL panel
+  appendLine($("panel-all"), state.totalPackets, ip, message);
+
+  // -- append to device panel
+  const panelEl = $(`panel-${sid}`);
+  if (panelEl) appendLine(panelEl, dev.lineCount, ip, message);
+
+  setStatus(`${ip}  →  ${message.slice(0, 60)}${message.length > 60 ? "…" : ""}`);
+}
+
+/* ── WebSocket ────────────────────────────────────────────────────── */
+function setWsState(state_) {
+  const dot   = $("ws-dot");
+  const label = $("ws-label");
+  dot.className   = "";
+  dot.classList.add(state_);
+  label.textContent = state_.toUpperCase();
+}
+
+function connect() {
+  clearTimeout(state.reconnTimer);
+  setWsState("connecting");
+  setStatus("Connecting to " + WS_URL);
+
+  const ws = new WebSocket(WS_URL);
+
+  ws.onopen = () => {
+    setWsState("connected");
+    setStatus("Connected – listening for UDP packets");
+    state.ws = ws;
+  };
+
+  ws.onmessage = (ev) => handleMessage(ev.data);
+
+  ws.onclose = () => {
+    setWsState("disconnected");
+    setStatus(`Disconnected – reconnecting in ${RECONNECT_MS / 1000}s…`);
+    state.ws = null;
+    state.reconnTimer = setTimeout(connect, RECONNECT_MS);
+  };
+
+  ws.onerror = () => {
+    setStatus("WebSocket error");
+    ws.close();
+  };
+}
+
+/* ── Utilities ────────────────────────────────────────────────────── */
+function setStatus(msg) {
+  $("status-text").textContent = msg;
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/* ── Boot ─────────────────────────────────────────────────────────── */
+connect();
+</script>
+</body>
+</html>

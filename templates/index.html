@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ESP32 OTA Upload</title>
+
+    <style>
+
+        body{
+            font-family: Arial;
+            max-width: 500px;
+            margin: auto;
+            padding-top: 40px;
+        }
+
+        .bar{
+            width: 100%;
+            height: 30px;
+            background: #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .fill{
+            height: 100%;
+            width: 0%;
+            background: #4caf50;
+            transition: width 0.3s;
+        }
+
+    </style>
+</head>
+
+<body>
+
+    <h2>ESP32 OTA Upload</h2>
+
+    <input type="file" id="file">
+    <button onclick="upload()">Kirim</button>
+
+    <br><br>
+
+    <div class="bar">
+        <div class="fill" id="fill"></div>
+    </div>
+
+    <p id="status">Idle</p>
+
+    <pre id="log"></pre>
+
+<script>
+
+async function upload(){
+
+    let file = document.getElementById("file").files[0]
+
+    let formData = new FormData()
+
+    formData.append("file", file)
+
+    await fetch("/upload", {
+        method: "POST",
+        body: formData
+    })
+}
+
+async function updateProgress(){
+
+    let res = await fetch("/progress")
+
+    let data = await res.json()
+
+    document.getElementById("fill").style.width =
+        data.percent + "%"
+
+    document.getElementById("status").innerText =
+        data.status + " (" + data.percent + "%)"
+
+    document.getElementById("log").innerText =
+        data.log
+}
+
+setInterval(updateProgress, 1000)
+
+</script>
+
+</body>
+</html>

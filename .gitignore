@@ -1,23 +1,68 @@
-# Python cache
+# Python
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Virtual environment
-env/
 venv/
+.venv/
+env/
 
-# Logs
+# Secrets
+.env
+.env.*
+*.env
+!.env.example
+config.env
+secrets/
+credentials/
+*.pem
+*.key
+
+# Runtime and logs
 *.log
+*.pid
+*.sock
+.cache/
+cache/
 
-# SQLite databases
+# SQLite runtime and database
 *.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
 
-# Backup files
+# Temporary and backup files
 *.bak
 *.swp
 *.tmp
+*.old
 
-# IDE settings
+# IDE
 .vscode/
 .idea/
+
+# n8n private runtime
+n8n/.env
+n8n/.n8n/
+
+# Kandang runtime state
+data_state.json
+data_sensor.json
+state/
+
+# Machine learning model (backup terpisah)
+model_kandang.pkl
+
+# Temporary files
+*.save
+tes_izin.txt
+
+# n8n runtime
+n8n/
+.gitignore.backup
+.gitignore.backup

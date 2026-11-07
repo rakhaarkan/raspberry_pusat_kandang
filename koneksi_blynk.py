@@ -1,86 +1,56 @@
-from BlynkLib import Blynk
-
-BLYNK_AUTH = "Wl380IhMybLGDKPaG88Cg5Lvva7ylU7j"
-
-blynk = Blynk(BLYNK_AUTH)
-
-while True:
-    blynk.run()
-
-import time
+import BlynkLib
 import threading
+import time
 
-# ======================================================
-# KONFIGURASI BLYNK
-# ======================================================
+# Initialize Blynk
+#blynk = BlynkLib.Blynk('gDdRswSNzktJU8kB-iiwXRobPokhqbFC')
 
-BLYNK_TEMPLATE_ID = "TMPL6FMUyY7XQ"
-BLYNK_TEMPLATE_NAME = "Kipas Kandang Ayam"
-BLYNK_AUTH = "Wl380IhMybLGDKPaG88Cg5Lvva7ylU7j"
+# Register Virtual Pins
 
-# Inisialisasi Blynk
-blynk = blynklib.Blynk(BLYNK_AUTH)
+BLYNK_AUTH = "gDdRswSNzktJU8kB-iiwXRobPokhqbFC"
 
 
-# ======================================================
-# CALLBACK UNTUK MENERIMA DATA DARI BLYNK
-# ======================================================
+# ===================================================
+# Fungsi Blynk di proses terpisah
+# ===================================================
+def run_blynk():
+    blynk = BlynkLib.Blynk(BLYNK_AUTH)
 
-# Contoh V0 menerima mode kandang
-@blynk.on("V0")
-def v0_write(value):
-    print("Mode kandang dari Blynk:", value[0])
-    # tinggal masukkan ke variabel global kamu
-    # gl.mode_kandang = int(value[0])
+    # Contoh Virtual Write Handler
+    @blynk.on("V1")
+    def handle_v1_write(value):
+        print("V1 =>", value)
 
-# Contoh V1-V5 untuk 5 kipas
-@blynk.on("V1")
-def v1_write(value):
-    print("Kipas 1:", value[0])
+    @blynk.on("V2")
+    def handle_v2_write(value):
+        print("V2 =>", value)
 
-@blynk.on("V2")
-def v2_write(value):
-    print("Kipas 2:", value[0])
+    @blynk.on("V3")
+    def handle_v3_write(value):
+        print("V3 =>", value)
 
-@blynk.on("V3")
-def v3_write(value):
-    print("Kipas 3:", value[0])
+    @blynk.on("V4")
+    def handle_v4_write(value):
+        print("V4 =>", value)
 
-@blynk.on("V4")
-def v4_write(value):
-    print("Kipas 4:", value[0])
+    @blynk.on("V5")
+    def handle_v5_write(value):
+        print("V5 =>", value)
 
-@blynk.on("V5")
-def v5_write(value):
-    print("Kipas 5:", value[0])
+    def send_time():
+        blynk.virtual_write(7, "rakha")
 
-# ======================================================
-# FUNGSI UNTUK MENGIRIM DATA KE BLYNK
-# ======================================================
 
-def update_kipas_status(kipas_list):
-    """kirim status kipas [0,1,0,1,0]"""
-    for i, state in enumerate(kipas_list):
-        blynk.virtual_write(i + 1, state)
-
-def update_mode(mode):
-    """kirim mode (manual/otomatis/timer)"""
-    blynk.virtual_write(0, mode)
-
-def send_temperature(temp):
-    """Contoh kirim suhu ke V10"""
-    blynk.virtual_write(10, temp)
-
-# ======================================================
-# PROSES BLYNK LOOP (HARUS JALAN TERUS)
-# ======================================================
-
-def _run_blynk():
     while True:
-        blynk.run()
-        time.sleep(0.01)
+        try:
+            blynk.run()
+        except Exception as e:
+            print("Blynk exception:", e)
+            time.sleep(5)  # retry setelah delay
+        else:
+            time.sleep(0.05)  # sleep ringan agar CPU tidak full
 
-# Start thread Blynk
-threading.Thread(target=_run_blynk, daemon=True).start()
-
-print("Blynk sudah berjalan di background...")
+    
+if __name__ == "__main__":
+    blynk_process = Process(target=kb.run_blynk, daemon=True)
+    blynk_process.start()
