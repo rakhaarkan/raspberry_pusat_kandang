@@ -1,0 +1,10 @@
+[Unit]
+Description=Backup Project Kandang ke GitHub setiap hari pukul 02.00 WIB
+
+[Timer]
+OnCalendar=*-*-* 02:00:00 Asia/Jakarta
+Persistent=true
+Unit=kandang-github-backup.service
+
+[Install]
+WantedBy=timers.target

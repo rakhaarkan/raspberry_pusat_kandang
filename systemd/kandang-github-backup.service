@@ -1,0 +1,12 @@
+[Unit]
+Description=Backup perubahan Project Kandang ke GitHub
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=rakha
+Group=rakha
+WorkingDirectory=/home/rakha/Documents/Project_Kandang
+ExecStart=/usr/bin/python3 /home/rakha/Documents/Project_Kandang/backup_github.py
+UMask=0077
