@@ -52,6 +52,32 @@ app.add_middleware(
 BASE_DIR = Path(__file__).parent
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
+# === WEBSITE DASHBOARD LOKAL ===
+WEBSITE_DIR = Path("/home/rakha/Documents/kandangayamrakha")
+
+app.mount(
+    "/css",
+    StaticFiles(directory=WEBSITE_DIR / "css"),
+    name="website_css"
+)
+
+app.mount(
+    "/js",
+    StaticFiles(directory=WEBSITE_DIR / "js"),
+    name="website_js"
+)
+
+app.mount(
+    "/vendor",
+    StaticFiles(directory=WEBSITE_DIR / "vendor"),
+    name="website_vendor"
+)
+
+@app.get("/api/dashboard", include_in_schema=False)
+async def website_dashboard():
+    return FileResponse(WEBSITE_DIR / "index.html")
+
+
 KEYS = ["jumlah_ayam_awal", "jumlah_ayam_mati", "jumlah_ayam_dipanen",
         "jumlah_pakan_sak", "bobot_rata_rata", "harga_kontrak_ayam",
         "harga_bibit_ayam", "harga_obat_ayam", "harga_pakan_kg"]

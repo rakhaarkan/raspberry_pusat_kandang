@@ -103,7 +103,7 @@ document.querySelector('nav').onclick=e=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   const t=b.dataset.t;['kandang','dashboard','data','kebun'].forEach(x=>$('tab-'+x).hidden=x!==t);
   document.body.classList.toggle('dash',t==='dashboard');navh();
-  if(t==='dashboard'&&!$('dash').getAttribute('src'))$('dash').src='https://kandangayamrakha.netlify.app/';
+  if(t==='dashboard'&&!$('dash').getAttribute('src'))$('dash').src=LAN?'http://192.168.0.150:8080/api/dashboard':'/api/dashboard';
   if(t==='kebun')dStart();else dStop();
 };
 
