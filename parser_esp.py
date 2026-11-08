@@ -11,6 +11,67 @@ PROTOCOL_VERSION = 1
 
 
 # ============================================================
+# VALIDASI DASAR
+# ============================================================
+
+def is_valid_number(value: Any) -> bool:
+    """
+    Integer dan float diperbolehkan.
+    Boolean tidak dianggap angka.
+    NaN dan Infinity ditolak.
+    """
+
+    if isinstance(value, bool):
+        return False
+
+    if not isinstance(value, (int, float)):
+        return False
+
+    return math.isfinite(value)
+
+
+def is_valid_integer(value: Any) -> bool:
+    """
+    Integer murni.
+    Boolean tidak diperbolehkan.
+    """
+
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def is_valid_numeric_list(value: Any) -> bool:
+    if not isinstance(value, list):
+        return False
+
+    return all(is_valid_number(item) for item in value)
+
+
+def is_valid_integer_list(value: Any) -> bool:
+    if not isinstance(value, list):
+        return False
+
+    return all(is_valid_integer(item) for item in value)
+
+
+def is_valid_status_list(value: Any, expected_length: int) -> bool:
+    """
+    Validasi array status perangkat.
+    Setiap elemen harus integer 0 atau 1.
+    """
+
+    if not isinstance(value, list):
+        return False
+
+    if len(value) != expected_length:
+        return False
+
+    return all(
+        is_valid_integer(item) and item in (0, 1)
+        for item in value
+    )
+
+
+# ============================================================
 # REGISTRY: VARIABEL YANG BOLEH DIPERBARUI LANGSUNG
 # ============================================================
 
@@ -109,7 +170,13 @@ NUMERIC_FIELDS = {
 
     # CUACA
     "kode_cuaca",
-    
+    "indikator_cuaca",
+
+    # LAMPU DAN PERANGKAT
+    "lampu_luar",
+    "is_heater",
+    "is_celldeck",
+
     # TIMBANGAN
     "bobot_timbang",
 }
@@ -120,15 +187,8 @@ STRING_FIELDS = {
 }
 
 
-# List numerik.
-# raw_bobot_normal dan raw_bobot_kecil menerima scalar
-# maupun list karena format sumber datanya perlu disesuaikan.
 LIST_FIELDS = {
     "list_bobot_timbang",
-}
-
-
-FLEXIBLE_NUMERIC_FIELDS = {
     "raw_bobot_normal",
     "raw_bobot_kecil",
 }
@@ -139,53 +199,38 @@ FLEXIBLE_NUMERIC_FIELDS = {
 # ============================================================
 
 SPECIAL_FIELDS = {
+    # Status kipas individual
     *(f"kipas_{i}" for i in range(1, 11)),
+
+    # Array status kipas
+    "kipas",
     "kipas_inspeksi",
     "kipas_saklar",
+
+    # Informasi kontrol kipas
     "kipas_channel_aktif",
     "kipas_gagal_total",
     "kipas_generasi_terkonfirmasi",
+
+    # Identitas boot perangkat
     "esp32_boot_id_terakhir",
+
+    # Data RPM
     "rpm_kipas",
 }
 
 
-# Semua key yang diizinkan.
 ALLOWED_FIELDS = (
     NUMERIC_FIELDS
     | STRING_FIELDS
     | LIST_FIELDS
-    | FLEXIBLE_NUMERIC_FIELDS
     | SPECIAL_FIELDS
 )
 
 
 # ============================================================
-# VALIDASI TIPE DATA
+# VALIDASI FIELD LANGSUNG
 # ============================================================
-
-def is_valid_number(value: Any) -> bool:
-    """
-    Integer dan float diperbolehkan.
-    Boolean tidak dianggap angka.
-    NaN dan Infinity ditolak.
-    """
-
-    if isinstance(value, bool):
-        return False
-
-    if not isinstance(value, (int, float)):
-        return False
-
-    return math.isfinite(value)
-
-
-def is_valid_numeric_list(value: Any) -> bool:
-    if not isinstance(value, list):
-        return False
-
-    return all(is_valid_number(item) for item in value)
-
 
 def validate_field(key: str, value: Any) -> bool:
 
@@ -198,14 +243,55 @@ def validate_field(key: str, value: Any) -> bool:
     if key in LIST_FIELDS:
         return is_valid_numeric_list(value)
 
-    if key in FLEXIBLE_NUMERIC_FIELDS:
-        if is_valid_number(value):
-            return True
+    return False
 
-        if is_valid_numeric_list(value):
-            return True
 
-        return False
+# ============================================================
+# VALIDASI FIELD KHUSUS
+# ============================================================
+
+def validate_special_field(key: str, value: Any) -> bool:
+
+    # Status lima kipas
+    if key == "kipas":
+        return is_valid_status_list(value, 5)
+
+    # Status inspeksi dan saklar lima kipas
+    if key in ("kipas_inspeksi", "kipas_saklar"):
+        return is_valid_integer_list(value) and len(value) == 5
+
+    # Status kipas individual
+    if key.startswith("kipas_") and key not in (
+        "kipas_inspeksi",
+        "kipas_saklar",
+        "kipas_channel_aktif",
+        "kipas_gagal_total",
+        "kipas_generasi_terkonfirmasi",
+    ):
+        return is_valid_integer(value) and value in (0, 1)
+
+    # Kanal kipas aktif
+    if key == "kipas_channel_aktif":
+        return isinstance(value, str)
+
+    # Jumlah kegagalan kipas
+    if key == "kipas_gagal_total":
+        return is_valid_integer(value) and value >= 0
+
+    # Generasi status kipas
+    if key == "kipas_generasi_terkonfirmasi":
+        return is_valid_integer(value) and value >= 0
+
+    # Identitas boot ESP
+    if key == "esp32_boot_id_terakhir":
+        return (
+            isinstance(value, str)
+            or is_valid_integer(value)
+        )
+
+    # RPM sepuluh kipas
+    if key == "rpm_kipas":
+        return is_valid_integer_list(value) and len(value) == 10
 
     return False
 
@@ -220,16 +306,35 @@ async def parse_json_esp(
     lock_data,
 ):
     """
-    Parser universal JSON ESP32 -> Raspberry Pi.
+    Parser universal JSON ESP -> Raspberry Pi.
+
+    Format metadata:
+        {
+            "device_id": 151,
+            "protocol_version": 1
+        }
 
     Parameter:
-        payload   : JSON string dari ESP32
+        payload   : JSON string atau dictionary
         gl        : instance variabel_global.gl
-        lock_data : asyncio.Lock yang sudah digunakan sistem
+        lock_data : asyncio.Lock sistem
 
     Return:
-        dictionary berisi status parsing, data khusus,
-        variabel berhasil diperbarui, dan variabel ditolak.
+        {
+            "ok": bool,
+            "device_id": int,
+            "updated": list,
+            "special": dict,
+            "rejected": dict,
+            "unknown": list,
+            "error": str atau None
+        }
+
+    Catatan:
+        - Key tidak dikenal diabaikan.
+        - Key tidak dikirim tidak mengubah nilai lama.
+        - Data langsung diperbarui dengan lock_data.
+        - Data khusus dikembalikan untuk diproses terpisah.
     """
 
     result = {
@@ -267,11 +372,12 @@ async def parse_json_esp(
     device_id = data.get("device_id")
     protocol_version = data.get("protocol_version")
 
-    if (
-        isinstance(device_id, bool)
-        or not isinstance(device_id, int)
-    ):
+    if not is_valid_integer(device_id):
         result["error"] = "device_id tidak valid."
+        return result
+
+    if not is_valid_integer(protocol_version):
+        result["error"] = "protocol_version tidak valid."
         return result
 
     if protocol_version != PROTOCOL_VERSION:
@@ -300,30 +406,17 @@ async def parse_json_esp(
             result["unknown"].append(key)
             continue
 
-        # Data yang membutuhkan mekanisme khusus.
+        # Field khusus.
         if key in SPECIAL_FIELDS:
 
-            if key == "rpm_kipas":
-                if not is_valid_numeric_list(value):
-                    result["rejected"][key] = value
-                    continue
-
-            elif key == "esp32_boot_id_terakhir":
-                if not isinstance(value, (str, int)):
-                    result["rejected"][key] = value
-                    continue
-
-            elif not (
-                is_valid_number(value)
-                or isinstance(value, bool)
-            ):
+            if not validate_special_field(key, value):
                 result["rejected"][key] = value
                 continue
 
             special_updates[key] = value
             continue
 
-        # Validasi data langsung.
+        # Field langsung.
         if not validate_field(key, value):
             result["rejected"][key] = value
             continue
@@ -351,3 +444,6 @@ async def parse_json_esp(
     result["ok"] = True
 
     return result
+
+
+print("parser_esp.py dimuat.")
