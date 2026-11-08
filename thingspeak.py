@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+import threading
 from datetime import datetime, timezone
 import random
 from variabel_global import gl
@@ -49,10 +50,23 @@ def isi_default(target, referensi, min_offset, max_offset):
         return referensi + random.uniform(min_offset, max_offset)
     return target
 
+_lock_pengolah = threading.Lock()
+_terakhir_baca_db = 0.0
+DB_REFRESH_DETIK = 10   # bacaan SQLite dijalankan paling cepat tiap 10 detik
+
 def pengolah_json():
-    db.baca_sql_sensor()
-    db.load_data_bakul()
-    db.ekstrak_kwh_24()
+    # Dipanggil dari beberapa thread (task 1 detik, ThingSpeak 15 dtk/60 dtk) -> serialkan
+    with _lock_pengolah:
+        _pengolah_json()
+
+def _pengolah_json():
+    global _terakhir_baca_db
+    sekarang = time.monotonic()
+    if sekarang - _terakhir_baca_db >= DB_REFRESH_DETIK:
+        db.baca_sql_sensor()
+        db.load_data_bakul()
+        db.ekstrak_kwh_24()
+        _terakhir_baca_db = sekarang
     hitung_blok(gl.usia_ayam)
     
     """Konversi struktur pengolah_json Arduino ke Python + simpan 1 JSON besar."""
@@ -228,23 +242,27 @@ def pengolah_json():
     
 
 
+def _serialisasi_json_thingspeak(data):
+    """Jadikan data aman untuk dikirim ke ThingSpeak."""
+    if data is None:
+        return ""
+    if isinstance(data, (dict, list, tuple)):
+        return json.dumps(data, ensure_ascii=False, separators=(",", ":"), default=str)
+    return str(data)
+
+
 def split_json_to_fields(json_string, parts=8, size=240):
     """Potong JSON panjang menjadi maksimal 8 bagian, masing <= size chars."""
+    json_string = _serialisasi_json_thingspeak(json_string)
+    if not json_string:
+        return [""] * parts
 
-    # Jika input adalah dict, convert ke string JSON
-    if isinstance(json_string, dict):
-        json_string = json.dumps(json_string, separators=(",", ":"))
+    chunks = [json_string[i:i + size] for i in range(0, len(json_string), size)]
 
-    chunks = []
-    for i in range(0, len(json_string), size):
-        chunks.append(json_string[i:i+size])
-
-    # Pastikan jumlah chunk sesuai parts
     while len(chunks) < parts:
         chunks.append("")
 
     return chunks[:parts]
-
 
 
 def kirim_thingspeak():
@@ -267,12 +285,14 @@ def kirim_thingspeak():
     }
 
     try:
-        response = requests.post(THINGSPEAK_URL, data=payload)
-        print("[ThingSpeak] Status:", response.text)
+        response = requests.post(THINGSPEAK_URL, data=payload, timeout=15)
+        response.raise_for_status()
+        print("[ThingSpeak] Status:", response.status_code, response.text)
         response.close()
     except Exception as e:
         print("[ThingSpeak] ERROR:", e)
-        
+
+
 def kirim_thingspeak_2():
     pengolah_json()
 
@@ -293,8 +313,9 @@ def kirim_thingspeak_2():
     }
 
     try:
-        response = requests.post(THINGSPEAK_URL_2, data=payload)
-        print("[ThingSpeak] Status:", response.text)
+        response = requests.post(THINGSPEAK_URL_2, data=payload, timeout=15)
+        response.raise_for_status()
+        print("[ThingSpeak] Status:", response.status_code, response.text)
         response.close()
     except Exception as e:
         print("[ThingSpeak] ERROR:", e)

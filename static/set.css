@@ -118,3 +118,8 @@ pre{margin:0 0 12px;max-height:200px;overflow:auto;white-space:pre-wrap;word-bre
 .frame{position:fixed;top:env(safe-area-inset-top,0px);left:0;width:100%;height:calc(100vh - var(--navh,60px) - env(safe-area-inset-top,0px));height:calc(100dvh - var(--navh,60px) - env(safe-area-inset-top,0px));margin:0;border:0;background:var(--bg)}
 body.dash{padding:0}
 body.dash header,body.dash #banner{display:none}
+.aksi{min-height:64px;padding:10px;border:0;border-radius:12px;background:var(--warn);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.aksi-bahaya{background:var(--off)}
+.aksi.armed{outline:3px solid var(--tx);outline-offset:2px}
+.aksi:disabled{opacity:.5;cursor:not-allowed}
+.hint{margin-top:8px;font-size:12px;color:var(--mu)}

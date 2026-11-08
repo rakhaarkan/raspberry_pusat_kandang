@@ -261,6 +261,28 @@ $('dev').onclick=e=>{
 };
 rDev();
 
+// === Sistem: mulai ulang layanan / reboot (tekan dua kali) ===
+const AKSI={
+  restart:{url:'/api/sistem/restart-service',pesan:'Sistem dimulai ulang, halaman tersambung lagi sebentar lagi…'},
+  reboot:{url:'/api/sistem/reboot',pesan:'Raspberry Pi akan reboot, tunggu 1–2 menit…'}};
+const armed={};
+$('sistem').onclick=async e=>{
+  const b=e.target.closest('button[data-aksi]');if(!b||b.disabled)return;
+  const k=b.dataset.aksi,teks=b.dataset.teks;
+  if(!armed[k]){
+    armed[k]=setTimeout(()=>{delete armed[k];b.classList.remove('armed');b.textContent=teks},4000);
+    b.classList.add('armed');b.textContent='Tekan lagi untuk konfirmasi';return;
+  }
+  clearTimeout(armed[k]);delete armed[k];b.classList.remove('armed');b.disabled=true;b.textContent=teks;
+  try{
+    const r=await fetch(AKSI[k].url,{method:'POST'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.detail||('HTTP '+r.status));
+    toast(AKSI[k].pesan);
+  }catch(err){toast('Gagal: '+err.message)}
+  setTimeout(()=>{b.disabled=false},10000);
+};
+
 function conn(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/ws/kipas');
   ws.onopen=()=>{S.ws=true;S.version=0;render()};

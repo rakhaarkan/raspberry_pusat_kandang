@@ -175,6 +175,9 @@ def init_db():
             )
         """)
 
+        # Tanpa indeks ini setiap query timestamp memindai seluruh tabel
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_dataset_ts ON dataset_training_AI(timestamp)")
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS data_performa (
 
@@ -400,11 +403,13 @@ def load_data_bakul():
         conn.close()
         
 def hitung_jam_mandatori_kipas():
-    # Gunakan jam saat ini jika gl.jam tidak ada
+    # Gunakan jam saat ini jika gl.jam tidak valid atau tidak tersedia.
     try:
         jam = int(gl.jam)
+        if not 0 <= jam <= 23:
+            raise ValueError("Jam harus berada di antara 0 dan 23")
     except:
-        jam = localtime().tm_hour
+        jam = datetime.datetime.now().hour
 
     # --- Kategori 1: malam - pagi ---
     if jam >= 19 or jam <= 8:

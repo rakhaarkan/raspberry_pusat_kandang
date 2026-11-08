@@ -3,7 +3,7 @@ import aiohttp
 import json
 from variabel_global import gl, lock_data
 import status_esp32
-
+from parser_esp import parse_json_esp
 
 async def kirim_data_ke_esp(url_tujuan: str, data_akan_dikirim: str):
     """Mengirim data ke ESP lain menggunakan HTTP POST"""

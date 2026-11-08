@@ -1,11 +1,13 @@
 # webserver.py
 from fastapi import FastAPI, APIRouter, Request, Query, WebSocket, UploadFile, File, HTTPException, WebSocketDisconnect
 from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.background import BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import numpy as np
 import time, cv2, base64
 import asyncio
+import subprocess
 import random
 import json
 import os
@@ -2601,7 +2603,6 @@ async def waktu_json():
 
 @api_router.get("/dataweb")
 async def dataweb_json():
-    thg.pengolah_json()
     return json_response(gl.json_thingspeak)
 
 import sqlite3
@@ -2896,6 +2897,38 @@ def test_page():
     </html>
     """
     
+PERINTAH_SISTEM = {
+    "restart-service": ["sudo", "-n", "systemctl", "--no-block", "restart", "kandang.service"],
+    "reboot": ["sudo", "-n", "systemctl", "reboot"],
+}
+
+async def _eksekusi_sistem(perintah, jeda=1.0):
+    await asyncio.sleep(jeda)  # beri waktu respons sampai ke browser sebelum proses dimatikan
+    subprocess.Popen(perintah, start_new_session=True,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+async def _jalankan_aksi_sistem(nama: str, bg: BackgroundTasks, pesan: str):
+    perintah = PERINTAH_SISTEM[nama]
+    # sudo -l hanya memeriksa izin, tidak menjalankan perintahnya
+    try:
+        cek = await asyncio.to_thread(
+            subprocess.run, ["sudo", "-n", "-l", *perintah[2:]],
+            capture_output=True, text=True)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail="perintah sudo tidak ditemukan di sistem ini")
+    if cek.returncode != 0:
+        raise HTTPException(status_code=403,
+            detail="sudo belum diizinkan tanpa password untuk perintah ini (cek /etc/sudoers.d)")
+    bg.add_task(_eksekusi_sistem, perintah)
+    return {"status": "ok", "pesan": pesan}
+
+@api_router.post("/sistem/restart-service")
+async def sistem_restart_service(bg: BackgroundTasks):
+    return await _jalankan_aksi_sistem("restart-service", bg, "Layanan kandang dimulai ulang")
+
+@api_router.post("/sistem/reboot")
+async def sistem_reboot(bg: BackgroundTasks):
+    return await _jalankan_aksi_sistem("reboot", bg, "Raspberry Pi akan reboot")
 @api_router.get("/restart")
 async def restart():
     #os.system("sudo reboot now")

@@ -110,6 +110,7 @@ async def startup_event():
     asyncio.create_task(tugas_periodik(sn.cuaca, 60))
     asyncio.create_task(tugas_periodik(fu.cek_serial, 0.1))
     asyncio.create_task(tugas_periodik(fu.broadcastkan, 1))
+    asyncio.create_task(tugas_periodik(thg.pengolah_json, 1))  # siapkan JSON /api/dataweb tiap 1 detik
     asyncio.create_task(tugas_periodik(thg.kirim_thingspeak, 15))
     asyncio.create_task(tugas_periodik(thg.kirim_thingspeak_2, 60))
     asyncio.create_task(tugas_periodik(db.sync_data_bakul, 3600))

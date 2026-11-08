@@ -60,6 +60,14 @@
       <label class="sw"><span>Alarm lampu kipas rumah<small>Lampu indikator kipas di rumah berkedip saat listrik mati.</small></span><input id="alm" type="checkbox"></label>
       <label class="sw"><span>Tulis database<small>Menyimpan data sensor dan kipas ke database pelatihan.</small></span><input id="dbw" type="checkbox"></label>
     </div>
+    <div id="sistem" class="card">
+      <div class="lbl">Sistem</div>
+      <div class="g2">
+        <button class="aksi" data-aksi="restart" data-teks="Mulai ulang sistem">Mulai ulang sistem</button>
+        <button class="aksi aksi-bahaya" data-aksi="reboot" data-teks="Reboot Raspberry Pi">Reboot Raspberry Pi</button>
+      </div>
+      <div class="hint">Setiap tombol meminta tekan dua kali. Setelah reboot, tunggu 1–2 menit sampai halaman tersambung lagi.</div>
+    </div>
     <div class="card"><div class="lbl">Log data</div><pre id="log"></pre><a class="btn" href="/api/download-db">Unduh database</a></div>
   </section>
   <section id="tab-kebun" hidden><div id="dev"></div></section>
