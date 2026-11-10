@@ -115,6 +115,9 @@ async def timer_kipas():
 # --- Fungsi utama kontrol kipas ---
 async def kontrol_kipas_utama():
     # Debug / log status suhu
+    gl.suhu_atas = gl.suhu_tengah_atas
+    gl.suhu_dalam = gl.suhu_atas
+    gl.kelembapan_atas = gl.kelembapan_tengah_atas
     gl.debug_str[0] = f"{gl.suhu_atas},{gl.suhu_outlet_atas},{gl.suhu_luar},{gl.suhu_acuan}"
 
     gl.keterangan_web = (

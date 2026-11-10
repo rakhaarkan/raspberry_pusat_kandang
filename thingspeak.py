@@ -125,7 +125,7 @@ def _pengolah_json():
         ],
 
         "dhi": [
-            pd._to_int_no_decimal(gl.data_HI_atas,2),
+            pd._to_int_no_decimal(gl.data_HI_tengah_atas,2),
             gl.data_HI_bawah,
             gl.data_HI_luar + random.randint(-5, 5),
             gl.data_HI_inlet_atas,

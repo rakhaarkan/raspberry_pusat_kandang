@@ -73,7 +73,9 @@ def update_trend_dan_selisih():
 def kelola_suhu_acuan():
     if gl.usia_ayam >= 10:
         # Prioritas suhu atas, fallback suhu luar, fallback default
-        if gl.suhu_atas != 0:
+        if gl.suhu_tengah_atas != 0:
+            gl.suhu_acuan = gl.suhu_tengah_atas
+        elif gl.suhu_atas != 0:
             gl.suhu_acuan = gl.suhu_atas
         elif gl.suhu_luar != 0:
             gl.suhu_acuan = gl.suhu_luar

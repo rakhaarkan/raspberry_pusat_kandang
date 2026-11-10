@@ -59,6 +59,8 @@ class gl:
     suhu_greenhouse: float = 0.0
     suhu_inlet_atas: float = 0.0
     suhu_inlet_bawah: float = 0.0
+    suhu_tengah_atas: float = 0.0
+    suhu_tengah_bawah: float = 0.0
     suhu_outlet_atas: float = 0.0
     suhu_outlet_bawah: float = 0.0
     suhu_acuan: float = 0.0
@@ -97,6 +99,8 @@ class gl:
     kelembapan_greenhouse: float = 0.0
     kelembapan_inlet_atas: float = 0.0
     kelembapan_inlet_bawah: float = 0.0
+    kelembapan_tengah_atas: float = 0.0
+    kelembapan_tengah_bawah: float = 0.0
     kelembapan_outlet_atas: float = 0.0
     kelembapan_outlet_bawah: float = 0.0
 
@@ -109,6 +113,8 @@ class gl:
     data_HI_greenhouse: float = 0.0
     data_HI_inlet_atas: float = 0.0
     data_HI_inlet_bawah: float = 0.0
+    data_HI_tengah_atas: float = 0.0    
+    data_HI_tengah_bawah: float = 0.0
     data_HI_outlet_atas: float = 0.0
     data_HI_outlet_bawah: float = 0.0
 
