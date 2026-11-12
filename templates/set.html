@@ -51,7 +51,27 @@
       <div class="g"><label>Jumlah kipas<select id="s-jml"></select></label><label>Waktu hidup<select id="s-hdp"></select></label><label>Waktu mati<select id="s-mti"></select></label></div>
     </div>
   </section>
-  <section id="tab-dashboard" hidden><iframe id="dash" class="frame" title="Dashboard" allowfullscreen></iframe></section>
+  <section id="tab-dashboard" hidden>
+    <iframe id="dash" class="frame" title="Dashboard" allowfullscreen></iframe>
+    <div class="dcards">
+      <div class="card">
+        <div class="dh">
+          <div><div class="lbl" style="margin:0">Bobot timbangan saat ini</div><div class="dst" id="tst">Menghubungkan…</div></div>
+          <span id="tstate" class="badge">--</span>
+        </div>
+        <div class="tw"><b id="tw">--</b><span>gram</span></div>
+        <div class="tcmp">
+          <div class="tcmp-t"><span>Target usia <b id="tusia">--</b></span><span><b id="ttarget">--</b> g (batas <span id="trange">--</span>)</span></div>
+          <div class="bar"><i id="tbar"></i></div>
+        </div>
+        <div class="kgrid">
+          <button class="kt" id="b-tare">Tare</button>
+          <button class="kt kt-w" id="b-motor">Dorong ayam</button>
+          <button class="kt kt-r" id="b-reboot">Reboot</button>
+        </div>
+      </div>
+    </div>
+  </section>
   <section id="tab-data" hidden>
     <div class="card"><div class="lbl">Data ayam</div><div id="fields"></div></div>
     <div class="card">

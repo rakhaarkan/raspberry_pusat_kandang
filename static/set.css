@@ -135,3 +135,9 @@ body.dash main{max-width:none}
 .kt-w{background:var(--warn)}.kt-r{background:var(--off)}
 .kt:active{transform:scale(.95)}
 .kt.armed{outline:3px solid var(--tx);outline-offset:2px}
+
+.aksi{min-height:64px;padding:10px;border:0;border-radius:12px;background:var(--warn);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.aksi-bahaya{background:var(--off)}
+.aksi.armed{outline:3px solid var(--tx);outline-offset:2px}
+.aksi:disabled{opacity:.5;cursor:not-allowed}
+.hint{margin-top:8px;font-size:12px;color:var(--mu)}

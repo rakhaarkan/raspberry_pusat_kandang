@@ -1,5 +1,6 @@
 (()=>{
-const $=id=>document.getElementById(id);
+// Jika ada id yang tidak ada di set.html, jangan hentikan seluruh skrip: pakai elemen cadangan dan beri peringatan di console
+const $=id=>document.getElementById(id)||(console.warn('Elemen #'+id+' tidak ada di set.html'),document.createElement('div'));
 const S=Object.assign({kipas:[0,0,0,0,0],mode:2,usia:0,version:0,channel:'',tRem:0,tState:null,jml:1,hidup:10,mati:5,prt:0,alarm:0,dbw:0,data:{},log:'',suhu:null,min:0,max:0,target:0,ws:false,pend:{}},window.INIT||{});
 let ws,tt;
 const FAN='<svg viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="6" rx="3" ry="5"/><ellipse cx="12" cy="6" rx="3" ry="5" transform="rotate(120 12 12)"/><ellipse cx="12" cy="6" rx="3" ry="5" transform="rotate(240 12 12)"/></svg>';
@@ -105,6 +106,7 @@ document.querySelector('nav').onclick=e=>{
   document.body.classList.toggle('dash',t==='dashboard');navh();
   if(t==='dashboard'&&!$('dash').getAttribute('src'))$('dash').src=LAN?'http://192.168.0.150:8080/api/dashboard':'/api/dashboard';
   if(t==='kebun')dStart();else dStop();
+  if(t==='dashboard')tStart();else tStop();
 };
 
 // === Tab Data ===
@@ -261,10 +263,42 @@ $('dev').onclick=e=>{
 };
 rDev();
 
+// === Timbangan di tab Dashboard (WebSocket ke ESP timbangan) ===
+let tw=null,tAktif=false,tRetry=null,tArm=null;
+function tst(t,c){const e=$('tst');e.textContent=t+(c==='ok'&&!(LAN&&IP.timbangan)?' (via Pi)':'');e.className='dst '+c}
+function treset(){$('tw').textContent='--';$('tstate').textContent='--';$('tbar').style.width='0%'}
+function tupd(d){
+  $('tw').textContent=d.weight;
+  $('tstate').textContent=d.state;
+  $('tusia').textContent=d.age+' hari';
+  $('ttarget').textContent=d.target;
+  $('trange').textContent=d.min_weight+'g – '+d.max_weight+'g';
+  $('tbar').style.width=(d.target>0?Math.min(100,Math.max(0,d.weight/d.target*100)):0)+'%';
+}
+function tconn(){
+  if(!tAktif||(tw&&tw.readyState<2))return;
+  try{tw=new WebSocket(wsurl('timbangan'))}catch(e){tRetry=setTimeout(tconn,4000);return}
+  tw.onopen=()=>tst('Terhubung','ok');
+  tw.onmessage=e=>{try{tupd(JSON.parse(e.data))}catch(_){}};
+  tw.onclose=()=>{treset();tst('Terputus, menyambung ulang…','bad');if(tAktif)tRetry=setTimeout(tconn,2000)};
+  tw.onerror=()=>tw.close();
+}
+const tStart=()=>{tAktif=true;tconn()};
+const tStop=()=>{tAktif=false;clearTimeout(tRetry);if(tw)tw.close()};
+function tsend(cmd,pesan){
+  if(!tw||tw.readyState!==1)return toast('Timbangan belum terhubung');
+  tw.send(JSON.stringify({cmd}));toast(pesan);
+}
+$('b-tare').onclick=()=>tsend('TARE','Tare dikirim');
+$('b-motor').onclick=()=>tsend('ACTUATE','Motor pendorong dipicu');
+$('b-reboot').onclick=e=>{
+  const b=e.currentTarget;
+  if(!tArm){tArm=setTimeout(()=>{tArm=null;b.classList.remove('armed');b.textContent='Reboot'},4000);b.classList.add('armed');b.textContent='Tekan lagi';return}
+  clearTimeout(tArm);tArm=null;b.classList.remove('armed');b.textContent='Reboot';tsend('RESTART','Timbangan di-reboot');
+};
+
 // === Sistem: mulai ulang layanan / reboot (tekan dua kali) ===
-const AKSI={
-  restart:{url:'/api/sistem/restart-service',pesan:'Sistem dimulai ulang, halaman tersambung lagi sebentar lagi…'},
-  reboot:{url:'/api/sistem/reboot',pesan:'Raspberry Pi akan reboot, tunggu 1–2 menit…'}};
+const AKSI={restart:{url:'/api/sistem/restart-service',pesan:'Sistem dimulai ulang, halaman tersambung lagi sebentar lagi…'},reboot:{url:'/api/sistem/reboot',pesan:'Raspberry Pi akan reboot, tunggu 1–2 menit…'}};
 const armed={};
 $('sistem').onclick=async e=>{
   const b=e.target.closest('button[data-aksi]');if(!b||b.disabled)return;
