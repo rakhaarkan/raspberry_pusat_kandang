@@ -49,7 +49,7 @@ h1{flex:1;margin:0;font-size:22px;font-weight:700}
 .g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .g label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mu)}
 select{width:100%;padding:8px 6px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);font:inherit}
-nav{position:fixed;inset:auto 0 0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
+nav{position:fixed;z-index:10;inset:auto 0 0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;border:0;background:none;color:var(--mu);padding:9px 0 8px;font:inherit;font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer}
 nav button span{font-size:19px}nav .on{color:var(--ac);font-weight:700}
 #toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translate(-50%,16px);max-width:90vw;padding:10px 16px;border-radius:10px;background:var(--tx);color:var(--bg);font-size:13px;text-align:center;opacity:0;pointer-events:none;transition:.25s}
@@ -115,23 +115,25 @@ pre{margin:0 0 12px;max-height:200px;overflow:auto;white-space:pre-wrap;word-bre
 .dpair .dh{flex-direction:column;align-items:flex-start;gap:2px}
 .dpair .dgrid{grid-template-columns:minmax(0,110px);justify-content:center}
 
-.frame{display:block;width:100%;height:calc(100vh - var(--navh,60px) - env(safe-area-inset-top,0px) - var(--peek,84px));height:calc(100dvh - var(--navh,60px) - env(safe-area-inset-top,0px) - var(--peek,84px));margin:0 0 12px;border:0;background:var(--bg)}
-body.dash{padding:env(safe-area-inset-top,0px) 0 calc(var(--navh,60px) + 12px)}
+#tab-dashboard{position:static;display:block}
+#tab-dashboard .frame{position:static;display:block;width:100%;height:calc(100vh - var(--navh,60px) - env(safe-area-inset-top,0px));height:calc(100dvh - var(--navh,60px) - env(safe-area-inset-top,0px));margin:0;border:0;background:var(--bg)}
+body.dash{padding:env(safe-area-inset-top,0px) 0 var(--navh,60px)}
 body.dash header,body.dash #banner{display:none}
 body.dash main{max-width:none}
-.dcards{max-width:560px;margin:0 auto}
+.dcards{border-top:1px solid var(--bd);background:var(--card)}
+.dcards .card{max-width:560px;margin:0 auto;padding:10px 14px;border:0;border-radius:0;background:transparent}
 
 .badge{padding:4px 10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);font-size:12px;font-weight:700}
-.tw{display:flex;align-items:baseline;gap:8px;margin:10px 0 14px}
-.tw b{font-size:56px;line-height:1;font-variant-numeric:tabular-nums}
-.tw span{font-size:20px;font-weight:700;color:var(--warn)}
-.tcmp{padding:10px;border:1px solid var(--bd);border-radius:12px;background:var(--bg)}
+.tw{display:flex;align-items:baseline;gap:8px;margin:6px 0 8px}
+.tw b{font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.tw span{font-size:16px;font-weight:700;color:var(--warn)}
+.tcmp{padding:8px 10px;border:1px solid var(--bd);border-radius:12px;background:var(--bg)}
 .tcmp-t{display:flex;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px;color:var(--mu)}
 .tcmp-t b{color:var(--tx)}
 .bar{height:10px;border-radius:99px;background:var(--bd);overflow:hidden}
 .bar i{display:block;width:0;height:100%;background:var(--tile);transition:width .3s}
-.kgrid{display:grid;grid-template-columns:repeat(3,minmax(0,110px));justify-content:center;gap:8px;margin-top:14px}
-.kt{aspect-ratio:1;padding:6px;border:0;border-radius:12px;background:var(--ac);color:#fff;font:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:transform .15s}
+.kgrid{display:grid;grid-template-columns:repeat(3,56px);justify-content:center;gap:8px;margin-top:8px}
+.kt{width:56px;aspect-ratio:1;padding:2px;border:0;border-radius:12px;background:var(--ac);color:#fff;font:inherit;font-size:11px;font-weight:700;cursor:pointer;transition:transform .15s}
 .kt-w{background:var(--warn)}.kt-r{background:var(--off)}
 .kt:active{transform:scale(.95)}
 .kt.armed{outline:3px solid var(--tx);outline-offset:2px}

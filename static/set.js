@@ -104,7 +104,7 @@ document.querySelector('nav').onclick=e=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   const t=b.dataset.t;['kandang','dashboard','data','kebun'].forEach(x=>$('tab-'+x).hidden=x!==t);
   document.body.classList.toggle('dash',t==='dashboard');navh();
-  if(t==='dashboard'&&!$('dash').getAttribute('src'))$('dash').src=LAN?'http://192.168.0.150:8080/api/dashboard':'/api/dashboard';
+  if(t==='dashboard'&&!$('dash').getAttribute('src'))$('dash').src='/api/dashboard';
   if(t==='kebun')dStart();else dStop();
   if(t==='dashboard')tStart();else tStop();
 };
@@ -264,7 +264,7 @@ $('dev').onclick=e=>{
 rDev();
 
 // === Timbangan di tab Dashboard (WebSocket ke ESP timbangan) ===
-let tw=null,tAktif=false,tRetry=null,tArm=null;
+let tw=null,tAktif=false,tRetry=null,tCek=null,tArm=null;
 function tst(t,c){const e=$('tst');e.textContent=t+(c==='ok'&&!(LAN&&IP.timbangan)?' (via Pi)':'');e.className='dst '+c}
 function treset(){$('tw').textContent='--';$('tstate').textContent='--';$('tbar').style.width='0%'}
 function tupd(d){
@@ -277,14 +277,32 @@ function tupd(d){
 }
 function tconn(){
   if(!tAktif||(tw&&tw.readyState<2))return;
-  try{tw=new WebSocket(wsurl('timbangan'))}catch(e){tRetry=setTimeout(tconn,4000);return}
-  tw.onopen=()=>tst('Terhubung','ok');
-  tw.onmessage=e=>{try{tupd(JSON.parse(e.data))}catch(_){}};
-  tw.onclose=()=>{treset();tst('Terputus, menyambung ulang…','bad');if(tAktif)tRetry=setTimeout(tconn,2000)};
-  tw.onerror=()=>tw.close();
+  const url=wsurl('timbangan'),alamat=url.replace(/^wss?:\/\//,'');
+  let dibuka=false,frame=0;
+  console.info('[timbangan] menghubungkan ke',url);
+  tst('Menghubungkan ke '+alamat+'…','wait');
+  let sock;
+  try{sock=tw=new WebSocket(url)}catch(e){tst('Gagal membuat koneksi: '+e.message,'bad');tRetry=setTimeout(tconn,4000);return}
+  sock.onopen=()=>{
+    dibuka=true;tst('Terhubung, menunggu data…','ok');
+    tCek=setTimeout(()=>{if(!frame)tst('Terhubung ke '+alamat+', tetapi belum ada data dari timbangan','bad')},5000);
+  };
+  sock.onmessage=e=>{
+    frame++;
+    try{tupd(JSON.parse(e.data));tst('Terhubung','ok')}
+    catch(_){console.warn('[timbangan] pesan tidak dikenali:',e.data)}
+  };
+  sock.onclose=ev=>{
+    clearTimeout(tCek);treset();
+    let t=dibuka?'Terputus (kode '+ev.code+'), menyambung ulang…':'Tidak bisa terhubung ke '+alamat+' (kode '+ev.code+')';
+    if(!dibuka&&ev.code===1008)t='Server belum mengenal "timbangan": tambahkan ke PROXY_DEV di webserver.py';
+    tst(t,'bad');
+    if(tAktif&&tw===sock)tRetry=setTimeout(tconn,2000);
+  };
+  sock.onerror=()=>{};   // onclose menyusul dan menjelaskan penyebabnya
 }
 const tStart=()=>{tAktif=true;tconn()};
-const tStop=()=>{tAktif=false;clearTimeout(tRetry);if(tw)tw.close()};
+const tStop=()=>{tAktif=false;clearTimeout(tRetry);clearTimeout(tCek);if(tw)tw.close()};
 function tsend(cmd,pesan){
   if(!tw||tw.readyState!==1)return toast('Timbangan belum terhubung');
   tw.send(JSON.stringify({cmd}));toast(pesan);
@@ -316,6 +334,21 @@ $('sistem').onclick=async e=>{
   }catch(err){toast('Gagal: '+err.message)}
   setTimeout(()=>{b.disabled=false},10000);
 };
+
+// === Iframe dashboard setinggi isinya: iframe + kartu timbangan menyatu dalam satu gulir ===
+function fitDash(){
+  const f=$('dash'),minH=innerHeight-document.querySelector('nav').offsetHeight;
+  let d;try{d=f.contentDocument}catch(e){return}            // beda origin: tetap setinggi layar
+  if(!d||!d.documentElement||!d.body)return;
+  const h=f.clientWidth>=1024?minH:Math.max(minH,Math.ceil(d.documentElement.getBoundingClientRect().height));  // layout desktop memakai tinggi viewport
+  if(Math.abs(f.offsetHeight-h)>2)f.style.height=h+'px';
+}
+$('dash').addEventListener('load',()=>{
+  fitDash();
+  try{const w=$('dash').contentWindow;new w.ResizeObserver(fitDash).observe(w.document.documentElement)}catch(e){}
+});
+setInterval(()=>{if(document.body.classList.contains('dash'))fitDash()},1000);
+addEventListener('resize',fitDash);
 
 function conn(){
   ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/ws/kipas');
